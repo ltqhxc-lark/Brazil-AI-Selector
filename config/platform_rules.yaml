@@ -1,0 +1,113 @@
+# ==============================================================================
+# 巴西三大电商平台费用与规则配置文件 (2026年最新版)
+# ==============================================================================
+# 本文件包含且仅包含以下三大平台本土店铺的佣金、手续费、物流和增值服务规则：
+# 1. Mercado Livre Brasil (美客多巴西本土店)
+# 2. Shopee Brasil (虾皮巴西本土店)
+# 3. TikTok Shop Brasil (TikTok 巴西本土店)
+#
+# 所有计算参数均已配置化，避免在 Python 计算器中硬编码。
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Mercado Livre Brasil (美客多巴西本土店)
+# ------------------------------------------------------------------------------
+mercado_livre_brasil:
+  platform_name: "Mercado Livre Brasil"
+  currency: "BRL"
+
+  # 销售佣金率 (Comissões por tipo de anúncio)
+  commission_rates:
+    classic: 0.12     # 经典曝光（Classic）基础佣金率（典型范围：12% - 14%）
+    premium: 0.17     # 黄金曝光（Premium）基础佣金率（典型范围：17% - 19%）
+
+  # 低价商品固定销售手续费 (Custo fixo para produtos abaixo de R$ 79)
+  fixed_fee:
+    threshold_brl: 79.00  # 低价商品阈值：售价低于 79.00 BRL 时收取固定费
+    fee_brl: 6.00         # 低于阈值时每单/每件加收的固定交易手续费 (6.00 BRL)
+
+  # 官方物流配送费用 (Mercado Envios)
+  # 政策：商品单价达到或超过 79.00 BRL 时，买家享受免费配送（Frete Grátis），卖家强制承担运费
+  shipping:
+    free_shipping_threshold_brl: 79.00  # 强制买家免邮的最低售价阈值
+    
+    # Mercado Envios Full 实收运费阶梯表 (根据包装后重量)
+    brackets:
+      - { max_weight_g: 300, base_freight_brl: 18.50 }   # <= 300g
+      - { max_weight_g: 500, base_freight_brl: 20.00 }   # <= 500g
+      - { max_weight_g: 1000, base_freight_brl: 22.50 }  # <= 1.0kg
+      - { max_weight_g: 2000, base_freight_brl: 26.00 }  # <= 2.0kg
+      - { max_weight_g: 5000, base_freight_brl: 35.00 }  # <= 5.0kg
+      - { max_weight_g: 10000, base_freight_brl: 45.00 } # <= 10.0kg
+      - { max_weight_g: 30000, base_freight_brl: 75.00 } # <= 30.0kg
+
+    # 卖家信誉等级（Reputação）对应的官方运费折扣
+    # 美客多根据卖家的服务质量与信誉等级，对卖家承担的运费给予折扣
+    seller_discounts:
+      platinum: 0.50   # 铂金领袖（MercadoLíder Platinum）享受 50% 运费折扣
+      gold: 0.40       # 黄金领袖（MercadoLíder Gold）享受 40% 运费折扣
+      leader: 0.30     # 绿标/普通领袖（MercadoLíder）享受 30% 运费折扣
+      normal: 0.10     # 黄标/无信誉普通卖家享受 10% 运费折扣
+      red: 0.00        # 红标/橙标卖家不享受任何折扣 (0%)
+
+  # 退货与纠纷风险预留
+  risk_factors:
+    return_rate: 0.03        # 预估退货率 3%
+    loss_rate: 0.005         # 预估丢包/损耗率 0.5%
+
+# ------------------------------------------------------------------------------
+# 2. Shopee Brasil (虾皮巴西本土店)
+# ------------------------------------------------------------------------------
+shopee_brasil:
+  platform_name: "Shopee Brasil"
+  currency: "BRL"
+
+  # 销售佣金与交易手续费 (Comissões e Tarifas)
+  commission:
+    base_rate: 0.14                     # 基础销售佣金 14%
+    payment_processing_rate: 0.02       # 支付交易手续费 2% (每单额外收取，共 16%)
+    
+    # 免邮计划 (Programa de Frete Grátis Extra - FSS)
+    free_shipping_program:
+      participated: true                # 是否参加免邮计划（绝大多数大卖家强制/默认参加以获取流量）
+      extra_rate: 0.06                  # 参加免邮计划加收 6% 佣金（总抽佣比例变为 14% + 6% + 2% = 22%）
+      max_extra_fee_cap_brl: 30.00      # FSS 额外 6% 佣金单件商品封顶上限为 30.00 BRL
+
+    # 单件固定交易附加费 (2026最新政策：每件售出商品加收固定服务费)
+    fixed_fee_per_item_brl: 3.00        # 每售出一件商品固定收取 3.00 BRL
+
+  # 虾皮本土物流费用 (Shopee Envios)
+  # 巴西本土店铺，日常寄送的基础运费由买家支付或买家使用免邮券（FSS）抵扣
+  # 卖家需要关注的是超重分摊、退货成本及买家拒收导致的二次派送损失
+  shipping:
+    seller_shipping_subsidy_brl: 0.00  # 卖家主动向买家提供的运费补贴（默认 0）
+    loss_and_return_rate: 0.02          # 预留 2% 的销售额作为退换货及丢包损耗储备金
+
+# ------------------------------------------------------------------------------
+# 3. TikTok Shop Brasil (TikTok 巴西本土店)
+# ------------------------------------------------------------------------------
+tiktok_shop_brasil:
+  platform_name: "TikTok Shop Brasil"
+  currency: "BRL"
+
+  # 佣金与服务手续费 (Comissões e Tarifas)
+  commission:
+    base_rate: 0.15                     # 2026年最新基础销售佣金率 15%
+    fixed_handling_fee_brl: 1.00        # 单笔订单固定收取 1.00 BRL 订单处理费
+    
+    # 联盟达人分销佣金 (Programa de Afiliados)
+    affiliate:
+      enabled: true                     # 是否启用联盟达人分销计算
+      default_rate: 0.10                # 默认达人佣金比例 10% (由卖家自由设置)
+      min_rate: 0.01                    # 平台要求最低达人抽佣 1%
+
+    # 新店铺冷启动激励政策 (TikTok Shop Promo)
+    new_seller_incentive:
+      enabled: false                    # 是否启用新店铺优惠
+      promo_rate: 0.0199                # 新店促销期优惠佣金率 1.99% (通常前90天或前一定单量内)
+
+  # 物流与买家促活活动分摊 (Logística)
+  shipping:
+    co_paying_shipping_rate: 0.01       # 卖家参与平台联合免邮/促销活动的运费分摊比例（默认 1%）
+    flat_co_paying_fee_brl: 0.00        # 每笔订单固定运费分摊 (默认 0)
+    loss_and_return_rate: 0.015         # 预留 1.5% 销售额作为退换货损耗储备金

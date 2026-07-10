@@ -1,0 +1,186 @@
+# ==============================================================================
+# 巴西税制参数配置文件 (2026年最新税率框架)
+# ==============================================================================
+# 本文件包含巴西本土与跨境电商运营涉及的所有核心税种配置：
+# 1. Simples Nacional (小微企业统一税制 - 商业 Anexo I 完整版)
+# 2. ICMS (商品和服务流转税 - 州内与跨州流转税率)
+# 3. IPI (工业化产品税)
+# 4. PIS (社会一体化计划税 - 累积与非累积税制)
+# 5. COFINS (社会安全融资贡献税 - 累积与非累积税制)
+# 6. ISS (服务税 - 预留与配置)
+# 7. Importação (进口关税 - 包含跨境合规计划 Remessa Conforme 及正式进口税率)
+# 8. ICMS-ST (ICMS 替代征税 - 预留)
+# 9. Difal (跨州 ICMS 税率差额 - 预留)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Simples Nacional (巴西本土小微企业统一税制 - Anexo I Comércio 商业类)
+# ------------------------------------------------------------------------------
+# 计算公式（法定有效税率计算）：
+# 有效税率 (Alíquota Efetiva) = (过去12个月累计营业额 * 标称税率 - 速算扣除数) / 过去12个月累计营业额
+simples_nacional:
+  annex_type: "Anexo I - Comércio" # 适用于电商零售与批发的“商业”附表I
+  brackets:
+    - bracket_id: 1
+      min_annual_revenue_brl: 0.00
+      max_annual_revenue_brl: 180000.00
+      nominal_rate: 0.0400           # 第一档：标称税率 4.0%
+      deduction_brl: 0.00            # 速算扣除数 R$ 0.00
+
+    - bracket_id: 2
+      min_annual_revenue_brl: 180000.01
+      max_annual_revenue_brl: 360000.00
+      nominal_rate: 0.0730           # 第二档：标称税率 7.3%
+      deduction_brl: 5940.00         # 速算扣除数 R$ 5,940.00
+
+    - bracket_id: 3
+      min_annual_revenue_brl: 360000.01
+      max_annual_revenue_brl: 720000.00
+      nominal_rate: 0.0950           # 第三档：标称税率 9.5%
+      deduction_brl: 13860.00        # 速算扣除数 R$ 13,860.00
+
+    - bracket_id: 4
+      min_annual_revenue_brl: 720000.01
+      max_annual_revenue_brl: 1800000.00
+      nominal_rate: 0.1070          # 第四档：标称税率 10.7%
+      deduction_brl: 22500.00       # 速算扣除数 R$ 22,500.00
+
+    - bracket_id: 5
+      min_annual_revenue_brl: 1800000.01
+      max_annual_revenue_brl: 3600000.00
+      nominal_rate: 0.1430          # 第五档：标称税率 14.3%
+      deduction_brl: 87300.00       # 速算扣除数 R$ 87,300.00
+
+    - bracket_id: 6
+      min_annual_revenue_brl: 3600000.01
+      max_annual_revenue_brl: 4800000.00
+      nominal_rate: 0.1900          # 第六档：标称税率 19.0%
+      deduction_brl: 378000.00      # 速算扣除数 R$ 378,000.00
+
+# ------------------------------------------------------------------------------
+# 2. ICMS (商品和服务流通税)
+# ------------------------------------------------------------------------------
+icms:
+  # 州内销售税率 (Alíquotas Internas - 部分代表性电商核心大州)
+  intra_state:
+    SP: 0.18      # 圣保罗州 (São Paulo)：18% (巴西最大电商基地)
+    RJ: 0.20      # 里约热内卢州 (Rio de Janeiro)：20% (含州贫困基金 FECP)
+    MG: 0.18      # 米纳斯吉拉斯州 (Minas Gerais)：18%
+    PR: 0.19      # 巴拉那州 (Paraná)：19%
+    SC: 0.17      # 圣卡塔琳娜州 (Santa Catarina)：17%
+    RS: 0.17      # 南大河州 (Rio Grande do Sul)：17%
+    BA: 0.205     # 巴伊亚州 (Bahia)：20.5%
+    PE: 0.205     # 伯南布哥州 (Pernambuco)：20.5%
+    DF: 0.18      # 巴西利亚联邦区 (Distrito Federal)：18%
+    ES: 0.17      # 圣埃斯皮里图州 (Espírito Santo)：17%
+    default: 0.18 # 其他未列出州的默认平均州内税率：18%
+
+  # 跨州销售基本税率规则 (Alíquotas Interestaduais)
+  # 规则：从南部/东南部出发到北部/东北部/中西部/圣埃斯皮里图州为 7%；其他跨州路线为 12%。
+  # 圣保罗 (SP) 起发是最典型的发货路径。
+  inter_state:
+    origin_SP:
+      to_RJ: 0.12 # 圣保罗发往里约热内卢：12%
+      to_MG: 0.12 # 圣保罗发往米纳斯吉拉斯：12%
+      to_PR: 0.12 # 圣保罗发往巴拉那：12%
+      to_SC: 0.12 # 圣保罗发往圣卡塔琳娜：12%
+      to_RS: 0.12 # 圣保罗发往南大河州：12%
+      to_ES: 0.07 # 圣保罗发往圣埃斯皮里图（起发地为东南部，目的地为特区，属 7% 规则）
+      to_NE: 0.07 # 圣保罗发往巴西东北部各州 (如 BA, PE, CE)：7%
+      to_N: 0.07  # 圣保罗发往巴西北部各州 (如 AM, PA)：7%
+      to_CO: 0.07 # 圣保罗发往巴西中西部各州 (如 MT, MS, GO)：7%
+    default_inter_state_rate: 0.12 # 默认通用跨州税率：12%
+    imported_good_inter_state_rate: 0.04 # 进口货物（未经实质性加工，且进口比例 >40%）跨州统一为 4%
+
+# ------------------------------------------------------------------------------
+# 3. IPI (工业化产品税)
+# ------------------------------------------------------------------------------
+# 巴西对本地生产或进口的工业产品征收的税，电商纯零售商若不进行二次加工，通常在州内转售时不直接交 IPI（但在采购/进口时已承担）
+ipi:
+  enabled_for_reseller: false       # 纯贸易零售商在销售环节是否直接征收：通常为 false
+  default_import_rate: 0.10         # 进口环节默认估算税率：10%
+  rates_by_category:
+    electronics: 0.15               # 电子产品类目估算 IPI 税率：15%
+    cosmetics: 0.22                 # 化妆品/美妆类目估算 IPI 税率：22% (奢侈与美妆税率较高)
+    clothing: 0.00                  # 服装/鞋帽类目估算 IPI 税率：0%
+    home_appliances: 0.05           # 家用电器类目估算 IPI 税率：5%
+    default: 0.05                   # 其他未分类工业品默认：5%
+
+# ------------------------------------------------------------------------------
+# 4. PIS (社会一体化计划税)
+# ------------------------------------------------------------------------------
+# 根据企业纳税模式（Lucro Presumido 估算利润制 或 Lucro Real 实际利润制）决定
+pis:
+  cumulative_regime:
+    regime_name: "Lucro Presumido"  # 简易估算利润制下的累进税制
+    rate: 0.0065                    # PIS 税率 0.65% (不可抵扣采购)
+  non_cumulative_regime:
+    regime_name: "Lucro Real"       # 实际利润制下的非累进税制
+    rate: 0.0165                    # PIS 税率 1.65% (可抵扣采购中的 PIS)
+
+# ------------------------------------------------------------------------------
+# 5. COFINS (社会安全融资贡献税)
+# ------------------------------------------------------------------------------
+cofins:
+  cumulative_regime:
+    regime_name: "Lucro Presumido"  # 简易估算利润制下的累进税制
+    rate: 0.0300                    # COFINS 税率 3.00% (不可抵扣采购)
+  non_cumulative_regime:
+    regime_name: "Lucro Real"       # 实际利润制下的非累进税制
+    rate: 0.0760                    # COFINS 税率 7.60% (可抵扣采购中的 COFINS)
+
+# ------------------------------------------------------------------------------
+# 6. ISS (服务税 - 预留)
+# ------------------------------------------------------------------------------
+# 服务税属于市政税（Imposto Sobre Serviços）。电商主体作为销售实物商品不交此税，
+# 但若卖家提供增值服务（如技术咨询、配送物流代办服务、安装等），或平台向卖家收取的软件使用费中含 ISS，则需要预留计算。
+iss:
+  is_active: false                  # 本系统实物交易计算默认不启用服务税
+  default_rate: 0.05                # 默认服务税率：5% (市政税率一般在 2% - 5% 之间)
+  min_rate: 0.02                    # 法定最低服务税率：2%
+  max_rate: 0.05                    # 法定最高服务税率：5%
+
+# ------------------------------------------------------------------------------
+# 7. Importação (进口税 - 区分跨境电商与正式进口)
+# ------------------------------------------------------------------------------
+import_taxes:
+  # 跨境合规计划 (Programa Remessa Conforme - 针对速卖通、Shopee、Shein等跨境直邮)
+  remessa_conforme:
+    threshold_usd: 50.00            # 免征联邦进口税的起征点：50 美元
+    under_threshold:
+      federal_import_tax_rate: 0.20 # 2026年最新政策：低于50美元征收 20% 的联邦进口税
+      icms_rate: 0.17               # 进口统一征收 17% 的 ICMS
+    over_threshold:
+      federal_import_tax_rate: 0.60 # 超过50美元，征收 60% 的联邦进口税
+      icms_rate: 0.17               # 进口统一征收 17% 的 ICMS
+      deduction_usd: 12.00          # 超过50美元可享受 12.00 美元的固定速算税金扣减
+    # 注意：巴西进口 ICMS 计算是“内含税（Cálculo por Dentro）”，公式为：
+    # 总进口税金 = 申报价值 * 进口税率 + (申报价值 * (1 + 进口税率) / (1 - ICMS税率)) * ICMS税率
+
+  # 正式进口贸易 (Importação Formal - 本土卖家通过海运/集装箱正式报关进口)
+  formal_import:
+    ii_default_rate: 0.16           # 进口关税 (Imposto de Importação - II) 默认平均税率：16% (因 NCM 商品编码而异)
+    pis_import_rate: 0.0210         # 进口环节 PIS：2.1%
+    cofins_import_rate: 0.0965      # 进口环节 COFINS：9.65%
+    icms_import_rate: 0.18          # 进口结关州（如圣保罗）的进口 ICMS：18%
+    siscomex_fee_brl: 115.00        # 每份进口申报单 (DI) 的固定海关申报系统费
+
+# ------------------------------------------------------------------------------
+# 8. ICMS-ST (ICMS Substituição Tributária 替代征税 - 预留)
+# ------------------------------------------------------------------------------
+# 替代征税是指由产业链最前端（如生产商或进口商）代扣代缴后续流通环节所有 ICMS 的制度。
+# 适用于特定 NCM 商品（如美妆、汽配、饮料等）。零售商销售 ST 类商品时，销售额无需重复缴纳 ICMS。
+icms_st:
+  is_active: false                  # 本计算模块默认关闭替代征税计算 (需要结合商品 NCM 判断)
+  mva_default_rate: 0.40            # 默认增值边际率 (Margem de Valor Agregado - MVA)：40% (用于计算预估批发到零售的增值空间)
+  st_regulations_description: "ICMS-ST is calculated based on MVA of the target product and destination state."
+
+# ------------------------------------------------------------------------------
+# 9. Difal (Diferencial de Alíquota 跨州 ICMS 税率差额 - 预留)
+# ------------------------------------------------------------------------------
+# 当本土公司（非 Simples Nacional 或超过起征额）向外州非纳税人（普通个人消费者）跨州销售时，
+# 须向目的地州补缴发货州跨州税率（7%/12%）与目的地州州内税率（如20%）之间的差额（DIFAL）。
+difal:
+  is_active: false                  # Simples Nacional 企业销售通常不直接在单笔单据中计算 DIFAL（根据 STF 判决免除，除非另有州法）
+  calculation_method: "base_dupla" # 采用双重税基（Base Dupla）计算法（大多数州的标准）
+  description: "DIFAL = Destination State Intra-rate - Inter-state Rate. Calculated on double base for non-taxpayer buyers."

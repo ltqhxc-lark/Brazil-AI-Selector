@@ -1,0 +1,73 @@
+# ==============================================================================
+# Brazil-AI-Selector 全局系统参数配置文件 (2026年最新版)
+# ==============================================================================
+# 本文件包含了项目所有的核心全局配置项，涵盖系统环境、本地化、目录路径、
+# 外部配置文件引用路径、AI 基础模型及 API Key 预留。
+# 所有配置均在此管理，禁止在 Python 代码中硬编码任何参数或密钥。
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. 项目基础信息与系统模式
+# ------------------------------------------------------------------------------
+app_info:
+  project_name: "Brazil-AI-Selector"       # 项目名称：巴西电商选品与财务利润分析系统
+  environment: "development"               # 运行环境：development（开发）, staging（测试）, production（生产）
+  debug: true                              # 调试模式开关：true 启用详细调试输出，false 禁用
+  log_level: "DEBUG"                       # 日志级别：DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# ------------------------------------------------------------------------------
+# 2. 本地化与时区配置 (Localization)
+# ------------------------------------------------------------------------------
+localization:
+  default_currency: "BRL"                  # 默认本币货币：雷亚尔 (R$ / BRL)
+  default_language: "pt-BR"                # 默认系统与报告输出语言：巴西葡萄牙语 (pt-BR)
+  timezone: "America/Sao_Paulo"            # 系统默认时区：圣保罗时间 (America/Sao_Paulo)
+
+# ------------------------------------------------------------------------------
+# 3. 存储与目录配置 (Paths & Directories)
+# ------------------------------------------------------------------------------
+storage:
+  # 数据库连接 (SQLite)
+  database_url: "sqlite:///db/brazil_selector.db" # SQLite 数据库连接 URL（统一存放在 db 文件夹内）
+
+  # 运行目录配置 (所有路径建议使用相对路径或系统变量)
+  export_dir: "exports/"                   # 导出目录：用于存放生成的 Excel/PDF 财务报告或选品分析书
+  cache_dir: "cache/"                     # 缓存目录：用于存放选品信息、汇率及临时抓取数据的缓存
+  temp_dir: "temp/"                       # 临时目录：系统运行中产生的临时过渡文件目录
+
+# ------------------------------------------------------------------------------
+# 4. 依赖配置文件路径 (Reference Configuration Files)
+# ------------------------------------------------------------------------------
+config_files:
+  platform_rules_path: "config/platform_rules.yaml" # 平台佣金及物流规则配置文件路径
+  taxes_config_path: "config/taxes_brazil.yaml"     # 巴西复杂税收规则与阶梯配置文件路径
+
+# ------------------------------------------------------------------------------
+# 5. AI 智能分析模型配置预留 (AI Models & Providers)
+# ------------------------------------------------------------------------------
+ai_config:
+  default_provider: "gemini"               # 默认 AI 供应商：gemini, openai, claude, deepseek
+  temperature: 0.2                         # AI 文本生成的随机性/创造度：0.2（偏向精确的财务与选品逻辑分析）
+  max_tokens: 2048                         # 单次生成最大 Token 限制
+  
+  # 模型名称具体映射
+  models:
+    gemini:
+      model_name: "gemini-1.5-pro"        # 谷歌 Gemini 模型名称
+    openai:
+      model_name: "gpt-4o"                 # OpenAI 默认模型名称
+    claude:
+      model_name: "claude-3-5-sonnet"      # Anthropic Claude 默认模型名称
+    deepseek:
+      model_name: "deepseek-chat"          # DeepSeek 默认模型名称
+
+# ------------------------------------------------------------------------------
+# 6. 安全与第三方 API 密钥预留 (Secrets & API Keys)
+# ------------------------------------------------------------------------------
+# 注意：在生产环境或 Git 提交流程中，强烈建议将具体 API Key 写入环境变量（如 .env 文件），
+# 并在本配置中通过环境变量占位符加载（例如 ${GEMINI_API_KEY}）。此处进行字段预留与示占位。
+api_keys:
+  gemini_api_key: "${GEMINI_API_KEY}"     # 谷歌 Gemini API Key 预留占位符
+  openai_api_key: "${OPENAI_API_KEY}"     # OpenAI API Key 预留占位符
+  claude_api_key: "${CLAUDE_API_KEY}"     # Anthropic Claude API Key 预留占位符
+  deepseek_api_key: "${DEEPSEEK_API_KEY}" # DeepSeek API Key 预留占位符
