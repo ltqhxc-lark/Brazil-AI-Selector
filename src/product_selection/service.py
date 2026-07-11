@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Brazil-AI-Selector - 选品分析综合服务
+Brazil-AI-Selector - 选品分析综合业务服务层
+集成了已有财务试算、物理体积重、多维度打分评级逻辑，以及 SQLAlchemy 数据库仓储持久化能力。
 """
 
 import logging
+from decimal import Decimal
 from typing import List, Optional, Tuple
+from sqlalchemy.orm import Session
 from src.models.product import Product
 from src.models.platform import Platform
 from src.services.profit_service import ProfitService
@@ -15,6 +18,8 @@ from src.product_selection.models import MarketData, SelectionCriteria, Selectio
 from src.product_selection.calculator import ProductSelectionCalculator
 from src.product_selection.scoring import ProductScoringEngine
 from src.product_selection.recommendation import SelectionRecommender
+from src.product_selection.db_models import SelectionProductDB, SelectionMarketDataDB, SelectionResultDB
+from src.product_selection.repository import ProductRepository, MarketDataRepository, SelectionResultRepository
 
 logger = logging.getLogger(__name__)
 
@@ -47,22 +52,16 @@ class ProductSelectionService:
         platform_name: str = "Mercado Livre Brasil"
     ) -> SelectionResult:
         """
-        评估单款商品的选品可行性并输出综合报告。
-        
-        调用已有模块（ProfitService, TaxService, FeeService, ShippingCalculator）来核算财务成本，
-        结合反推公式估算售价，并通过打分引擎给出最终综合得分和推荐等级。
+        [纯内存业务] 评估单款商品的选品可行性并输出综合报告 (不包含任何数据库持久化读写)。
         """
-        # 1. 确保评估配置存在
         criteria = criteria or SelectionCriteria()
 
-        # 2. 建立一个初始的销售平台实例 (使用市场平均售价作为试算价格，用来反算税率、佣金费率和物流费)
         temp_platform = Platform(
             platform_id=platform_id,
             platform_name=platform_name,
             selling_price_brl=market_data.average_selling_price_brl
         )
 
-        # 3. 试算此产品的费率 (佣金比例、有效税率、首重运费成本) - 完全复用已有模块
         fee_res = self._fee_service.get_fee_analysis(product, temp_platform)
         platform_fee_ratio = fee_res.fee_to_revenue_ratio
         
@@ -71,7 +70,6 @@ class ProductSelectionService:
         
         shipping_fee_brl = self._shipping_calculator.calculate(product, temp_platform)
 
-        # 4. 反推满足最低净利率目标的建议零售价
         estimated_retail_price = ProductSelectionCalculator.calculate_estimated_selling_price(
             cost_price_brl=product.cost_price_brl,
             estimated_shipping_brl=shipping_fee_brl,
@@ -80,23 +78,19 @@ class ProductSelectionService:
             target_margin_ratio=criteria.min_net_margin
         )
 
-        # 5. 用反推售价建立最终销售平台实例
         final_platform = Platform(
             platform_id=platform_id,
             platform_name=platform_name,
             selling_price_brl=estimated_retail_price
         )
 
-        # 6. 调用已有 ProfitService 汇总计算真实利润和各维度支出，拒绝公式复制
         profit_res = self._profit_service.calculate_profitability(product, final_platform)
 
-        # 7. 基于已有计算结果计算 ROI 与利润率
         estimated_net_profit = profit_res.net_profit
         estimated_margin = profit_res.margin
         estimated_roi = ProductSelectionCalculator.calculate_roi(estimated_net_profit, product.cost_price_brl)
         estimated_gross_profit = estimated_retail_price - product.cost_price_brl
 
-        # 8. 执行打分引擎评估选品得分
         scores = ProductScoringEngine.calculate_scores(
             product=product,
             market_data=market_data,
@@ -105,11 +99,9 @@ class ProductSelectionService:
             criteria=criteria
         )
 
-        # 9. 自动生成高信号推荐理由与风险预警
         reasons = []
         warnings = []
 
-        # 评分评级反馈
         if scores.recommendation_level == "S":
             reasons.append(f"产品打分极高 ({scores.total_score}分)，综合表现极其强劲。")
         elif scores.recommendation_level == "A":
@@ -117,7 +109,6 @@ class ProductSelectionService:
         elif scores.recommendation_level == "B":
             reasons.append(f"产品打分及格 ({scores.total_score}分)，商业可行，建议谨慎跟进。")
 
-        # 财务指标反馈
         if estimated_roi >= criteria.target_roi:
             reasons.append(f"预期 ROI ({round(estimated_roi * 100, 2)}%) 达到或超过目标水平。")
         else:
@@ -128,14 +119,12 @@ class ProductSelectionService:
         else:
             warnings.append(f"预期净利率 ({round(estimated_margin * 100, 2)}%) 偏低，利润空间不足。")
 
-        # 物流物理反馈
         vol_weight_g = ProductSelectionCalculator.calculate_volumetric_weight_g(product)
         if product.weight_g > criteria.overweight_threshold_g:
             warnings.append(f"商品实际重量为 {product.weight_g}g，已超过 {criteria.overweight_threshold_g}g 的轻量门槛。")
         if vol_weight_g > product.weight_g:
             warnings.append(f"商品体积重为 {vol_weight_g}g，显著超出物理实重，属于轻抛货物。")
 
-        # 市场环境反馈
         if market_data.demand_score >= criteria.demand_sales_thresholds.get("high", 8.0):
             reasons.append(f"市场需求极其旺盛 (需求评分: {market_data.demand_score}/10.0)。")
         if market_data.competitor_count >= criteria.competition_seller_thresholds.get("very_high_limit", 20):
@@ -166,17 +155,7 @@ class ProductSelectionService:
         platform_name: str = "Mercado Livre Brasil"
     ) -> Tuple[List[SelectionResult], List[Tuple[str, str]]]:
         """
-        批量评估多款候选商品，支持部分商品失败不中断整体流程。
-        
-        Args:
-            products: 商品 Product 数据对象列表
-            market_data_list: 商品市场 MarketData 属性列表
-            criteria: 选品配置对象
-            
-        Returns:
-            Tuple[List[SelectionResult], List[Tuple[str, str]]]:
-                - 评估成功且满足 Criteria 过滤条件并通过排序的选品列表。
-                - 评估失败的商品 SKU 及其对应异常详细信息的列表，形如: [("SKU_001", "ValueError...")]
+        [纯内存业务] 批量评估多款候选商品，支持部分商品失败不中断整体流程。
         """
         if len(products) != len(market_data_list):
             raise ValueError(
@@ -199,12 +178,206 @@ class ProductSelectionService:
                 )
                 results.append(res)
             except Exception as e:
-                # 记录单个评估失败错误，保障整批流程继续
                 error_msg = f"{type(e).__name__}: {str(e)}"
                 sku = prod.sku if hasattr(prod, 'sku') else "Unknown"
                 logger.error(f"商品 {sku} 选品试算评估失败，错误信息: {error_msg}")
                 errors.append((sku, error_msg))
 
-        # 调用 SelectionRecommender 进行排序降序、底线过滤
         ranked_results = SelectionRecommender.rank_and_filter(results, criteria)
+        return ranked_results, errors
+
+    # ==============================================================================
+    # 数据库集成业务方法 (实现事务边界、调用 Repository 读写)
+    # ==============================================================================
+
+    def _evaluate_and_persist_single(
+        self,
+        session: Session,
+        product: Product,
+        market_data: MarketData,
+        criteria: SelectionCriteria,
+        platform_id: str,
+        platform_name: str
+    ) -> SelectionResultDB:
+        """
+        【内部私有辅助方法】执行单件商品的评估、打分并写入数据库（仅 flush，不单独管理事务）。
+        """
+        product_repo = ProductRepository(session)
+        market_repo = MarketDataRepository(session)
+        result_repo = SelectionResultRepository(session)
+
+        # 1. 在数据库中创建或同步更新选品商品基础静态规格
+        db_product = product_repo.get_by_sku(product.sku)
+        if db_product:
+            db_product = product_repo.update(
+                product.sku,
+                name=product.name,
+                cost_price_brl=Decimal(str(product.cost_price_brl)),
+                weight_g=Decimal(str(product.weight_g)),
+                length_cm=Decimal(str(product.length_cm)),
+                width_cm=Decimal(str(product.width_cm)),
+                height_cm=Decimal(str(product.height_cm)),
+                category=product.category,
+                declared_value_usd=Decimal(str(product.declared_value_usd))
+            )
+        else:
+            db_product = product_repo.create(
+                sku=product.sku,
+                name=product.name,
+                cost_price_brl=Decimal(str(product.cost_price_brl)),
+                weight_g=Decimal(str(product.weight_g)),
+                length_cm=Decimal(str(product.length_cm)),
+                width_cm=Decimal(str(product.width_cm)),
+                height_cm=Decimal(str(product.height_cm)),
+                category=product.category,
+                declared_value_usd=Decimal(str(product.declared_value_usd))
+            )
+
+        # 2. 持久化本次市场评估条件
+        db_market = market_repo.create(
+            product_id=db_product.id,
+            average_selling_price_brl=Decimal(str(market_data.average_selling_price_brl)),
+            competitor_count=market_data.competitor_count,
+            demand_score=Decimal(str(market_data.demand_score)),
+            trend_factor=Decimal(str(market_data.trend_factor))
+        )
+
+        # 3. 运行已有的内存精算、反推与打分业务，绝对不复制公式
+        res = self.evaluate_product(
+            product=product,
+            market_data=market_data,
+            criteria=criteria,
+            platform_id=platform_id,
+            platform_name=platform_name
+        )
+
+        # 4. 持久化最终综合选品报告结果 (不 commit)
+        db_result = result_repo.save_result(
+            product_id=db_product.id,
+            market_data_id=db_market.id,
+            estimated_retail_price_brl=Decimal(str(res.estimated_retail_price_brl)),
+            estimated_net_profit_brl=Decimal(str(res.estimated_net_profit_brl)),
+            estimated_roi=Decimal(str(res.estimated_roi)),
+            estimated_margin=Decimal(str(res.estimated_margin)),
+            estimated_tax_brl=Decimal(str(res.estimated_tax_brl)),
+            estimated_platform_fee_brl=Decimal(str(res.estimated_platform_fee_brl)),
+            estimated_shipping_brl=Decimal(str(res.estimated_shipping_brl)),
+            estimated_gross_profit_brl=Decimal(str(res.estimated_gross_profit_brl)),
+            total_score=Decimal(str(res.scores.total_score)),
+            profit_score=Decimal(str(res.scores.profit_score)),
+            demand_score=Decimal(str(res.scores.demand_score)),
+            competition_score=Decimal(str(res.scores.competition_score)),
+            logistics_score=Decimal(str(res.scores.logistics_score)),
+            recommendation_level=res.scores.recommendation_level,
+            recommendation_reasons=res.recommendation_reasons,
+            risk_warnings=res.risk_warnings
+        )
+        return db_result
+
+    def evaluate_and_save_product(
+        self,
+        session: Session,
+        product: Product,
+        market_data: MarketData,
+        criteria: Optional[SelectionCriteria] = None,
+        platform_id: str = "mercado_livre_brasil",
+        platform_name: str = "Mercado Livre Brasil"
+    ) -> SelectionResultDB:
+        """
+        评估单款商品并将商品、市场瞬时条件以及评估结果报告持久化存储到数据库。
+        
+        事务边界：
+            负责本业务边界的显式事务管理（commit / rollback），失败时回滚并原样向上抛出异常。
+        """
+        criteria = criteria or SelectionCriteria()
+        try:
+            db_result = self._evaluate_and_persist_single(
+                session=session,
+                product=product,
+                market_data=market_data,
+                criteria=criteria,
+                platform_id=platform_id,
+                platform_name=platform_name
+            )
+            session.commit()
+            return db_result
+        except Exception as e:
+            session.rollback()
+            raise e
+
+    def evaluate_and_save_batch(
+        self,
+        session: Session,
+        products: List[Product],
+        market_data_list: List[MarketData],
+        criteria: Optional[SelectionCriteria] = None,
+        platform_id: str = "mercado_livre_brasil",
+        platform_name: str = "Mercado Livre Brasil"
+    ) -> Tuple[List[SelectionResultDB], List[Tuple[str, str]]]:
+        """
+        批量评估多款商品并将全部成功评估的选品持久化存储到数据库。
+        
+        容错性：
+            单个商品因各种规格或约束异常发生失败时，记录错误详情并不中断整批。
+            利用 SQLAlchemy 的 Savepoint (session.begin_nested())，使失败商品回滚至其自身的独立保存点。
+            
+        排序与过滤：
+            符合 criteria.min_net_margin、criteria.target_roi 以及不属于 C 级的评估结果
+            会组成最终结果集，并按照综合得分 total_score 由高到低（降序）进行排序呈报。
+        """
+        if len(products) != len(market_data_list):
+            raise ValueError(
+                f"商品列表与市场数据列表长度不一致，无法批量匹配。"
+                f"(商品数量: {len(products)}, 市场数据数量: {len(market_data_list)})"
+            )
+
+        criteria = criteria or SelectionCriteria()
+        results = []
+        errors = []
+
+        for prod, market in zip(products, market_data_list):
+            # 对单个商品执行 Savepoint 嵌套事务，保障局部故障不影响其他商品状态
+            nested_sp = session.begin_nested()
+            try:
+                db_result = self._evaluate_and_persist_single(
+                    session=session,
+                    product=prod,
+                    market_data=market,
+                    criteria=criteria,
+                    platform_id=platform_id,
+                    platform_name=platform_name
+                )
+                results.append(db_result)
+            except Exception as e:
+                # 回滚此单件商品的局部 savepoint
+                nested_sp.rollback()
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                sku = prod.sku if hasattr(prod, 'sku') else "Unknown"
+                logger.error(f"商品 {sku} 批量评估持久化局部失败，错误信息: {error_msg}")
+                errors.append((sku, error_msg))
+
+        try:
+            # 批量成功的商品提交持久化
+            if results:
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
+
+        # 对最终评估成果应用推荐决策器的过滤条件（利润底线、ROI 达标线、C 级不推荐）并倒序排序
+        filtered_results = []
+        for r in results:
+            # 过滤低于最低净利润率标准的选品
+            if r.estimated_margin < Decimal(str(criteria.min_net_margin)):
+                continue
+            # 过滤低于最低 ROI 达标线的选品
+            if r.estimated_roi < Decimal(str(criteria.target_roi)):
+                continue
+            # 过滤不推荐的 C 级选品
+            if r.recommendation_level == "C":
+                continue
+            filtered_results.append(r)
+
+        # 按照综合评分 total_score 降序（由高到低）进行排序
+        ranked_results = sorted(filtered_results, key=lambda x: x.total_score, reverse=True)
         return ranked_results, errors

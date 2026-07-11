@@ -103,6 +103,7 @@ class SelectionResultDB(Base):
     recommendation_reasons: Mapped[List[str]] = mapped_column(JSON, nullable=False, default=list) # 推荐优势原因
     risk_warnings: Mapped[List[str]] = mapped_column(JSON, nullable=False, default=list)          # 运营风险警示
     
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, nullable=False, index=True) # 选品评估生成时间 (带时区)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
