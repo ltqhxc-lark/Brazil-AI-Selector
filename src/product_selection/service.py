@@ -5,6 +5,7 @@ Brazil-AI-Selector - 选品分析综合业务服务层
 """
 
 import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
@@ -381,3 +382,34 @@ class ProductSelectionService:
         # 按照综合评分 total_score 降序（由高到低）进行排序
         ranked_results = sorted(filtered_results, key=lambda x: x.total_score, reverse=True)
         return ranked_results, errors
+
+    def get_history(
+        self,
+        session: Session,
+        product_id: Optional[int] = None,
+        recommendation_level: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[SelectionResultDB]:
+        """
+        [数据库持久化集成接口] 查询历史选品报告详情清单，完全通过 SelectionResultRepository 读取。
+        """
+        result_repo = SelectionResultRepository(session)
+        return result_repo.get_history(
+            product_id=product_id,
+            recommendation_level=recommendation_level,
+            start_time=start_time,
+            end_time=end_time,
+            skip=skip,
+            limit=limit
+        )
+
+    def get_result_by_id(self, session: Session, result_id: int) -> Optional[SelectionResultDB]:
+        """
+        [数据库持久化集成接口] 根据主键 ID 调取单条历史决策报告，通过 SelectionResultRepository 读取。
+        """
+        result_repo = SelectionResultRepository(session)
+        return result_repo.get_by_id(result_id)
+
